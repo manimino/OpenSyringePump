@@ -1,0 +1,27 @@
+#######################################
+# Syntax Coloring Map For Matrix
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+
+LCD4Bit_mod KEYWORD1
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+
+clear 		KEYWORD2
+commandWrite 	KEYWORD2
+cursorTo 	KEYWORD2
+init 		KEYWORD2
+leftScroll 	KEYWORD2
+print 		KEYWORD2
+printIn 	KEYWORD2
+commandWriteNibble 	KEYWORD2
+
+#######################################
+# Constants (LITERAL1)
+#######################################
+
