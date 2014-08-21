@@ -1,7 +1,8 @@
 // Controls a stepper motor via an LCD keypad shield.
-// This is preliminary code, only compiles with Arduino version 022 at the moment. Updates coming soon.
+// Accepts triggers and serial commands.
 
-#include <LCD4Bit_mod.h> 
+#include <LiquidCrystal.h>
+#include <LCDKeypad.h>
 #include <AccelStepper.h>
 
 /* -- Constants -- */
@@ -18,7 +19,9 @@ long ustepsPerML = (MICROSTEPS_PER_STEP * STEPS_PER_REVOLUTION * SYRINGE_BARREL_
 /* -- Pin definitions -- */
 int motorDirPin = 2;
 int motorStepPin = 3;
-int triggerPin = A3;
+
+int pullTriggerPin = A2;
+int pushTriggerPin = A3;
 
 const int pwmA = 3;
 const int pwmB = 11;
@@ -26,15 +29,12 @@ const int brakeA = 8;
 const int brakeB = 9;
 
 //Key states
-//int  adc_key_val[5] ={30, 150, 360, 535, 760 };
-int  adc_key_val[5] ={50, 180, 400, 575, 800 };
-
+int  adc_key_val[5] ={30, 150, 360, 535, 760 };
 
 enum{ KEY_RIGHT, KEY_UP, KEY_DOWN, KEY_LEFT, KEY_SELECT, KEY_NONE};
 int NUM_KEYS = 5;
 int adc_key_in;
-int key=-1;
-int oldkey=-1;
+int key = KEY_NONE;
 
 //various enums
 enum{PUSH,PULL}; //syringe movement direction
@@ -56,28 +56,28 @@ long stepperPos = 0; //in microsteps
 char charBuf[16];
 
 //debounce params
-int lastTick = 0;
-int debounceTime = 50;
-
+long lastKeyRepeatAt = 0;
+long keyRepeatDelay = 400;
+long keyDebounce = 125;
+int prevKey = KEY_NONE;
+        
 //menu stuff
 int uiState = MAIN;
 
 //triggering
-int prevTrigger = LOW;
+int prevPullTrigger = HIGH;
+int prevPushTrigger = HIGH;
 
 /* -- Initialize libraries -- */
 AccelStepper stepper(1, motorStepPin, motorDirPin); //the "1" tells it we are using a driver
-//AccelStepper stepper(2,12,13);
-
-LCD4Bit_mod lcd = LCD4Bit_mod(2); 
+LiquidCrystal lcd(8, 13, 9, 4, 5, 6, 7);
 
 void setup(){
   /* LCD setup */  
-  lcd.init();
+  lcd.begin(16, 2);
   lcd.clear();
 
-  lcd.printIn("SyringePump v0.1");
-  lastTick = millis();
+  lcd.print("SyringePump v0.2");
 
   /* Stepper setup */
   stepper.setMaxSpeed(motorSpeed);
@@ -95,7 +95,10 @@ void setup(){
   digitalWrite(brakeB, LOW);
   
   /* Triggering setup */
-  pinMode(triggerPin, INPUT);
+  pinMode(pushTriggerPin, INPUT);
+  pinMode(pullTriggerPin, INPUT);
+  digitalWrite(pushTriggerPin, HIGH); //enable pullup resistor
+  digitalWrite(pullTriggerPin, HIGH); //enable pullup resistor
 }
 
 void loop(){
@@ -105,17 +108,31 @@ void loop(){
   //check for LCD updates
   readKey();
   
-  //look for trigger on trigger line
-  checkTrigger();
+  //look for triggers on trigger lines
+  checkTriggers();
+  
+  //check serial port for new commands
+  checkSerial();
 }
 
 
-void checkTrigger(){
-    int triggerValue = digitalRead(triggerPin);
-    if(triggerValue == HIGH && prevTrigger == LOW){
+void checkTriggers(){
+    int pushTriggerValue = digitalRead(pushTriggerPin);
+    if(pushTriggerValue == HIGH && prevPushTrigger == LOW){
       bolus(PUSH);
     }
-    prevTrigger = triggerValue;
+    prevPushTrigger = pushTriggerValue;
+    
+    int pullTriggerValue = digitalRead(pullTriggerPin);
+    if(pullTriggerValue == HIGH && prevPullTrigger == LOW){
+      bolus(PULL);
+    }
+    prevPullTrigger = pullTriggerValue;
+}
+
+void checkSerial(){
+   //Not implemented yet! 
+   //Coming very soon.
 }
 
 void bolus(int direction){
@@ -139,26 +156,34 @@ void bolus(int direction){
 }
 
 void readKey(){
-	//don't poll too often
-	long currentTime = millis();
-	if ((currentTime-lastTick) < debounceTime){
-		return;
-	}
-	
-	lastTick = currentTime;
+	//Some UI niceness here. 
+        //When user holds down a key, it will repeat every so often (keyRepeatDelay).
+        //But when user presses and releases a key, 
+        //the key becomes responsive again after the shorter debounce period (keyDebounce).
+
 	adc_key_in = analogRead(0);
 	key = get_key(adc_key_in); // convert into key press
 
-	if (key != oldkey){
-	if (oldkey == KEY_NONE || key == KEY_NONE){
-			oldkey = key;
-			doKeyAction(key);
-		}
-		else{
-			//wait for there to be a KEY_NONE before accepting a new key.
-			oldkey = key;
-		}
-	}  
+	long currentTime = millis();
+        long timeSinceLastPress = (currentTime-lastKeyRepeatAt);
+        
+        boolean processThisKey = false;
+	if (prevKey == key && timeSinceLastPress > keyRepeatDelay){
+          processThisKey = true;
+        }
+        if(prevKey == KEY_NONE && timeSinceLastPress > keyDebounce){
+          processThisKey = true;
+        }
+        if(key == KEY_NONE){
+          processThisKey = false;
+        }  
+        
+        prevKey = key;
+        
+        if(processThisKey){
+          doKeyAction(key);
+  	  lastKeyRepeatAt = currentTime;
+        }
 }
 
 void doKeyAction(unsigned int key){
@@ -228,12 +253,12 @@ void doKeyAction(unsigned int key){
 	lcd.clear();
 
 	s2.toCharArray(charBuf, 16);
-	lcd.cursorTo(2, 0);  //line=2, x=0
-	lcd.printIn(charBuf);
+	lcd.setCursor(0, 1);  //line=2, x=0
+	lcd.print(charBuf);
 	
 	s1.toCharArray(charBuf, 16);
-	lcd.cursorTo(1, 0);  //line=1, x=0
-	lcd.printIn(charBuf);
+	lcd.setCursor(0, 0);  //line=1, x=0
+	lcd.print(charBuf);
 		
 	
 	//debugging - write character ADC
