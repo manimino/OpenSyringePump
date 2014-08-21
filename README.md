@@ -1,8 +1,10 @@
 OpenSyringePump
 ===============
 
-Arduino code that runs the Open Syringe Pump.
-
 See full project description at hackaday.io: http://hackaday.io/project/1838
 
-Requires the libraries from the 'libraries' dir in this repository. Copy them into your Arduino\libraries directory to use.
+'3D files' contains OpenSCAD and STL files for customizing and printing the plastic pieces.
+
+'SyringePump' contains the Arduino code. It requires the AccelStepper from the 'libraries' dir in this repository. Copy it into your Arduino\libraries directory to use. You can also get the library from the author's page here: http://www.airspayce.com/mikem/arduino/AccelStepper/
+
+Licensed GPL V2, see terms here: http://www.gnu.org/copyleft/gpl.html

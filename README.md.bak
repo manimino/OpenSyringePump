@@ -1,8 +1,8 @@
 OpenSyringePump
 ===============
 
-Arduino code that runs the Open Syringe Pump
+Arduino code that runs the Open Syringe Pump.
 
-Compile using arduino-022 --> https://code.google.com/p/arduino/downloads/detail?name=arduino-0022.zip&can=2&q
+See full project description at hackaday.io: http://hackaday.io/project/1838
 
-Requires the libraries from the 'libraries' dir in this repository. (Libraries are not mine, but they're GPL.)
+Requires the libraries from the 'libraries' dir in this repository. Copy them into your Arduino\libraries directory to use.
