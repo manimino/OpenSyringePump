@@ -148,15 +148,17 @@ void checkTriggers(){
 void readSerial(){
 		//pulls in characters from serial port as they arrive
 		//builds serialStr and sets ready flag when newline is found
+		//strips newline
 		while (Serial.available()) {
 			char inChar = (char)Serial.read(); 
-			serialStr += inChar;
 			if (inChar == '\n') {
 				serialStrReady = true;
 			} 
+      else{
+			  serialStr += inChar;
+      }
 		}
 }
-
 void processSerial(){
 	//process serial commands as they are read in
 	if(serialStr.equals("+")){
@@ -167,6 +169,14 @@ void processSerial(){
 		bolus(PULL);
 		updateScreen();
 	}
+	else{
+		Serial.write("Invalid command: ["); 
+		char buf[40];
+		serialStr.toCharArray(buf, 40);
+		Serial.write(buf); 
+		Serial.write("]\n"); 
+	}
+	serialStrReady = false;
 	serialStr = "";
 }
 

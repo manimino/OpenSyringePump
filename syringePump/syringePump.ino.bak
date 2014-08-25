@@ -103,6 +103,12 @@ void setup(){
   pinMode(pullTriggerPin, INPUT);
   digitalWrite(pushTriggerPin, HIGH); //enable pullup resistor
   digitalWrite(pullTriggerPin, HIGH); //enable pullup resistor
+  
+  /* Serial setup */
+  //Note that serial commands must be terminated with a newline
+  //to be processed. Check this setting in your serial monitor if 
+  //serial commands aren't doing anything.
+  Serial.begin(9600);
 }
 
 void loop(){
@@ -144,23 +150,32 @@ void readSerial(){
 		//builds serialStr and sets ready flag when newline is found
 		while (Serial.available()) {
 			char inChar = (char)Serial.read(); 
-			serialStr += inChar;
 			if (inChar == '\n') {
 				serialStrReady = true;
 			} 
+      else{
+			  serialStr += inChar;
+      }
 		}
 }
-
 void processSerial(){
 	//process serial commands as they are read in
-	if(serialStr == "+"){
+	if(serialStr.equals("+")){
 		bolus(PUSH);
 		updateScreen();
 	}
-	else if(serialStr == "-"){
+	else if(serialStr.equals("-")){
 		bolus(PULL);
 		updateScreen();
 	}
+	else{
+		Serial.write("Invalid command: ["); 
+		char buf[40];
+		serialStr.toCharArray(buf, 40);
+		Serial.write(buf); 
+		Serial.write("]\n"); 
+	}
+	serialStrReady = false;
 	serialStr = "";
 }
 
@@ -257,11 +272,9 @@ void doKeyAction(unsigned int key){
 
 	if(uiState == MAIN){
 		if(key == KEY_LEFT){
-			s2 = (String("Pull ") + decToString(mLBolus) + String(" mL"));
 			bolus(PULL);
 		}
 		if(key == KEY_RIGHT){
-			s2 = (String("Push ") + decToString(mLBolus) + String(" mL"));
 			bolus(PUSH);
 		}
 		if(key == KEY_UP){
