@@ -103,6 +103,12 @@ void setup(){
   pinMode(pullTriggerPin, INPUT);
   digitalWrite(pushTriggerPin, HIGH); //enable pullup resistor
   digitalWrite(pullTriggerPin, HIGH); //enable pullup resistor
+  
+  /* Serial setup */
+  //Note that serial commands must be terminated with a newline
+  //to be processed. Check this setting in your serial monitor if 
+  //serial commands aren't doing anything.
+  Serial.begin(9600);
 }
 
 void loop(){
@@ -153,11 +159,11 @@ void readSerial(){
 
 void processSerial(){
 	//process serial commands as they are read in
-	if(serialStr == "+"){
+	if(serialStr.equals("+")){
 		bolus(PUSH);
 		updateScreen();
 	}
-	else if(serialStr == "-"){
+	else if(serialStr.equals("-")){
 		bolus(PULL);
 		updateScreen();
 	}
