@@ -68,6 +68,10 @@ int uiState = MAIN;
 int prevPullTrigger = HIGH;
 int prevPushTrigger = HIGH;
 
+//serial
+String serialStr = "";
+boolean serialStrReady = false;
+
 /* -- Initialize libraries -- */
 AccelStepper stepper(1, motorStepPin, motorDirPin); //the "1" tells it we are using a driver
 LiquidCrystal lcd(8, 13, 9, 4, 5, 6, 7);
@@ -112,7 +116,10 @@ void loop(){
   checkTriggers();
   
   //check serial port for new commands
-  checkSerial();
+  readSerial();
+	if(serialStrReady){
+		processSerial();
+	}
 }
 
 
@@ -120,19 +127,41 @@ void checkTriggers(){
     int pushTriggerValue = digitalRead(pushTriggerPin);
     if(pushTriggerValue == HIGH && prevPushTrigger == LOW){
       bolus(PUSH);
+			updateScreen();
     }
     prevPushTrigger = pushTriggerValue;
     
     int pullTriggerValue = digitalRead(pullTriggerPin);
     if(pullTriggerValue == HIGH && prevPullTrigger == LOW){
       bolus(PULL);
+			updateScreen();
     }
     prevPullTrigger = pullTriggerValue;
 }
 
-void checkSerial(){
-   //Not implemented yet! 
-   //Coming very soon.
+void readSerial(){
+		//pulls in characters from serial port as they arrive
+		//builds serialStr and sets ready flag when newline is found
+		while (Serial.available()) {
+			char inChar = (char)Serial.read(); 
+			serialStr += inChar;
+			if (inChar == '\n') {
+				serialStrReady = true;
+			} 
+		}
+}
+
+void processSerial(){
+	//process serial commands as they are read in
+	if(serialStr == "+"){
+		bolus(PUSH);
+		updateScreen();
+	}
+	else if(serialStr == "-"){
+		bolus(PULL);
+		updateScreen();
+	}
+	serialStr = "";
 }
 
 void bolus(int direction){
@@ -155,11 +184,37 @@ void bolus(int direction){
 	stepper.moveTo(stepperPos);
 }
 
+void updateScreen(){
+	//build strings for upper and lower lines of screen
+	String s1; //upper line
+	String s2; //lower line
+	
+	if(uiState == MAIN){
+		s1 = String("Used ") + decToString(mLUsed) + String(" mL");
+		s2 = (String("Bolus ") + decToString(mLBolus) + String(" mL"));		
+	}
+	else if(uiState == BOLUS_MENU){
+		s1 = String("Menu> BolusStep");
+		s2 = decToString(mLBolusStep);
+	}
+
+	//do actual screen update
+	lcd.clear();
+
+	s2.toCharArray(charBuf, 16);
+	lcd.setCursor(0, 1);  //line=2, x=0
+	lcd.print(charBuf);
+	
+	s1.toCharArray(charBuf, 16);
+	lcd.setCursor(0, 0);  //line=1, x=0
+	lcd.print(charBuf);
+}
+
 void readKey(){
 	//Some UI niceness here. 
-        //When user holds down a key, it will repeat every so often (keyRepeatDelay).
-        //But when user presses and releases a key, 
-        //the key becomes responsive again after the shorter debounce period (keyDebounce).
+	//When user holds down a key, it will repeat every so often (keyRepeatDelay).
+	//But when user presses and releases a key, 
+	//the key becomes responsive again after the shorter debounce period (keyDebounce).
 
 	adc_key_in = analogRead(0);
 	key = get_key(adc_key_in); // convert into key press
@@ -200,16 +255,11 @@ void doKeyAction(unsigned int key){
 		}
 	}
 
-	String s1; //upper line
-	String s2; //lower line
-	
 	if(uiState == MAIN){
 		if(key == KEY_LEFT){
-			s2 = (String("Pull ") + decToString(mLBolus) + String(" mL"));
 			bolus(PULL);
 		}
 		if(key == KEY_RIGHT){
-			s2 = (String("Push ") + decToString(mLBolus) + String(" mL"));
 			bolus(PUSH);
 		}
 		if(key == KEY_UP){
@@ -223,8 +273,6 @@ void doKeyAction(unsigned int key){
 			  mLBolus = 0;
 			}
 		}
-		s1 = String("Used ") + decToString(mLUsed) + String(" mL");
-		s2 = (String("Bolus ") + decToString(mLBolus) + String(" mL"));		
 	}
 	else if(uiState == BOLUS_MENU){
 		if(key == KEY_LEFT){
@@ -245,29 +293,8 @@ void doKeyAction(unsigned int key){
 				mLBolusStep = mLBolusSteps[mLBolusStepIdx];
 			}
 		}
-		s1 = String("Menu> BolusStep");
-		s2 = decToString(mLBolusStep);
 	}
-
-	//update screen
-	lcd.clear();
-
-	s2.toCharArray(charBuf, 16);
-	lcd.setCursor(0, 1);  //line=2, x=0
-	lcd.print(charBuf);
-	
-	s1.toCharArray(charBuf, 16);
-	lcd.setCursor(0, 0);  //line=1, x=0
-	lcd.print(charBuf);
-		
-	
-	//debugging - write character ADC
-	/*
-        lcd.cursorTo(1, 0);  //line=2, x=0
-	String s = String("KEY_ADC: ") + String(adc_key_in);
-	s.toCharArray(charBuf, 16);
-	lcd.printIn(charBuf);  //line=2, x=0
-        */	
+	updateScreen();
 }
 
 

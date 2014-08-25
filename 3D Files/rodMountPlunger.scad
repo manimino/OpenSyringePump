@@ -7,7 +7,7 @@ spaceAboveFloor = 2;
 
 //plunger
 plungerDiameter = 26.5;
-plungerThickness = 2.5;
+plungerThickness = 2.2;
 plungerInnerDiameter = 15;
 plungerClipThickness = 3;
 plungerWellDepth = plungerThickness + plungerClipThickness;

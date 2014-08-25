@@ -1,6 +1,8 @@
 // Controls a stepper motor via an LCD keypad shield.
+// Accepts triggers and serial commands.
 
-#include <LCD4Bit_mod.h> 
+#include <LiquidCrystal.h>
+#include <LCDKeypad.h>
 #include <AccelStepper.h>
 
 /* -- Constants -- */
@@ -9,7 +11,7 @@
 
 #define THREADED_ROD_PITCH 1.25
 #define STEPS_PER_REVOLUTION 200.0
-#define MICROSTEPS_PER_STEP 16.0
+#define MICROSTEPS_PER_STEP 8.0
 
 long ustepsPerMM = MICROSTEPS_PER_STEP * STEPS_PER_REVOLUTION / THREADED_ROD_PITCH;
 long ustepsPerML = (MICROSTEPS_PER_STEP * STEPS_PER_REVOLUTION * SYRINGE_BARREL_LENGTH_MM) / (SYRINGE_VOLUME_ML * THREADED_ROD_PITCH );
@@ -17,18 +19,22 @@ long ustepsPerML = (MICROSTEPS_PER_STEP * STEPS_PER_REVOLUTION * SYRINGE_BARREL_
 /* -- Pin definitions -- */
 int motorDirPin = 2;
 int motorStepPin = 3;
-int triggerPin = A3;
+
+int pullTriggerPin = A2;
+int pushTriggerPin = A3;
+
+const int pwmA = 3;
+const int pwmB = 11;
+const int brakeA = 8;
+const int brakeB = 9;
 
 //Key states
-//int  adc_key_val[5] ={30, 150, 360, 535, 760 };
-int  adc_key_val[5] ={50, 180, 400, 575, 800 };
-
+int  adc_key_val[5] ={30, 150, 360, 535, 760 };
 
 enum{ KEY_RIGHT, KEY_UP, KEY_DOWN, KEY_LEFT, KEY_SELECT, KEY_NONE};
 int NUM_KEYS = 5;
 int adc_key_in;
-int key=-1;
-int oldkey=-1;
+int key = KEY_NONE;
 
 //various enums
 enum{PUSH,PULL}; //syringe movement direction
@@ -50,34 +56,53 @@ long stepperPos = 0; //in microsteps
 char charBuf[16];
 
 //debounce params
-int lastTick = 0;
-int debounceTime = 50;
-
+long lastKeyRepeatAt = 0;
+long keyRepeatDelay = 400;
+long keyDebounce = 125;
+int prevKey = KEY_NONE;
+        
 //menu stuff
 int uiState = MAIN;
 
 //triggering
-int prevTrigger = LOW;
+int prevPullTrigger = HIGH;
+int prevPushTrigger = HIGH;
+
+//serial
+String serialStr = "";
+boolean serialStrReady = false;
 
 /* -- Initialize libraries -- */
 AccelStepper stepper(1, motorStepPin, motorDirPin); //the "1" tells it we are using a driver
-LCD4Bit_mod lcd = LCD4Bit_mod(2); 
+LiquidCrystal lcd(8, 13, 9, 4, 5, 6, 7);
 
 void setup(){
   /* LCD setup */  
-  lcd.init();
+  lcd.begin(16, 2);
   lcd.clear();
 
-  lcd.printIn("SyringePump v0.1");
-  lastTick = millis();
+  lcd.print("SyringePump v0.2");
 
   /* Stepper setup */
   stepper.setMaxSpeed(motorSpeed);
   stepper.setSpeed(motorSpeed);
   stepper.setAcceleration(motorAccel);
+
+  pinMode(pwmA, OUTPUT);
+  pinMode(pwmB, OUTPUT);
+  pinMode(brakeA, OUTPUT);
+  pinMode(brakeB, OUTPUT);
+  
+  digitalWrite(pwmA, HIGH);
+  digitalWrite(pwmB, HIGH);
+  digitalWrite(brakeA, LOW);
+  digitalWrite(brakeB, LOW);
   
   /* Triggering setup */
-  pinMode(triggerPin, INPUT);
+  pinMode(pushTriggerPin, INPUT);
+  pinMode(pullTriggerPin, INPUT);
+  digitalWrite(pushTriggerPin, HIGH); //enable pullup resistor
+  digitalWrite(pullTriggerPin, HIGH); //enable pullup resistor
 }
 
 void loop(){
@@ -87,17 +112,56 @@ void loop(){
   //check for LCD updates
   readKey();
   
-  //look for trigger on trigger line
-  checkTrigger();
+  //look for triggers on trigger lines
+  checkTriggers();
+  
+  //check serial port for new commands
+  readSerial();
+	if(serialStrReady){
+		processSerial();
+	}
 }
 
 
-void checkTrigger(){
-    int triggerValue = digitalRead(triggerPin);
-    if(triggerValue == HIGH && prevTrigger == LOW){
+void checkTriggers(){
+    int pushTriggerValue = digitalRead(pushTriggerPin);
+    if(pushTriggerValue == HIGH && prevPushTrigger == LOW){
       bolus(PUSH);
+			updateScreen();
     }
-    prevTrigger = triggerValue;
+    prevPushTrigger = pushTriggerValue;
+    
+    int pullTriggerValue = digitalRead(pullTriggerPin);
+    if(pullTriggerValue == HIGH && prevPullTrigger == LOW){
+      bolus(PULL);
+			updateScreen();
+    }
+    prevPullTrigger = pullTriggerValue;
+}
+
+void readSerial(){
+		//pulls in characters from serial port as they arrive
+		//builds serialStr and sets ready flag when newline is found
+		while (Serial.available()) {
+			char inChar = (char)Serial.read(); 
+			serialStr += inChar;
+			if (inChar == '\n') {
+				serialStrReady = true;
+			} 
+		}
+}
+
+void processSerial(){
+	//process serial commands as they are read in
+	if(serialStr == "+"){
+		bolus(PUSH);
+		updateScreen();
+	}
+	else if(serialStr == "-"){
+		bolus(PULL);
+		updateScreen();
+	}
+	serialStr = "";
 }
 
 void bolus(int direction){
@@ -120,27 +184,61 @@ void bolus(int direction){
 	stepper.moveTo(stepperPos);
 }
 
-void readKey(){
-	//don't poll too often
-	long currentTime = millis();
-	if ((currentTime-lastTick) < debounceTime){
-		return;
-	}
+void updateScreen(){
+	//build strings for upper and lower lines of screen
+	String s1; //upper line
+	String s2; //lower line
 	
-	lastTick = currentTime;
+	if(uiState == MAIN){
+		s1 = String("Used ") + decToString(mLUsed) + String(" mL");
+		s2 = (String("Bolus ") + decToString(mLBolus) + String(" mL"));		
+	}
+	else if(uiState == BOLUS_MENU){
+		s1 = String("Menu> BolusStep");
+		s2 = decToString(mLBolusStep);
+	}
+
+	//do actual screen update
+	lcd.clear();
+
+	s2.toCharArray(charBuf, 16);
+	lcd.setCursor(0, 1);  //line=2, x=0
+	lcd.print(charBuf);
+	
+	s1.toCharArray(charBuf, 16);
+	lcd.setCursor(0, 0);  //line=1, x=0
+	lcd.print(charBuf);
+}
+
+void readKey(){
+	//Some UI niceness here. 
+	//When user holds down a key, it will repeat every so often (keyRepeatDelay).
+	//But when user presses and releases a key, 
+	//the key becomes responsive again after the shorter debounce period (keyDebounce).
+
 	adc_key_in = analogRead(0);
 	key = get_key(adc_key_in); // convert into key press
 
-	if (key != oldkey){
-	if (oldkey == KEY_NONE || key == KEY_NONE){
-			oldkey = key;
-			doKeyAction(key);
-		}
-		else{
-			//wait for there to be a KEY_NONE before accepting a new key.
-			oldkey = key;
-		}
-	}  
+	long currentTime = millis();
+        long timeSinceLastPress = (currentTime-lastKeyRepeatAt);
+        
+        boolean processThisKey = false;
+	if (prevKey == key && timeSinceLastPress > keyRepeatDelay){
+          processThisKey = true;
+        }
+        if(prevKey == KEY_NONE && timeSinceLastPress > keyDebounce){
+          processThisKey = true;
+        }
+        if(key == KEY_NONE){
+          processThisKey = false;
+        }  
+        
+        prevKey = key;
+        
+        if(processThisKey){
+          doKeyAction(key);
+  	  lastKeyRepeatAt = currentTime;
+        }
 }
 
 void doKeyAction(unsigned int key){
@@ -157,9 +255,6 @@ void doKeyAction(unsigned int key){
 		}
 	}
 
-	String s1; //upper line
-	String s2; //lower line
-	
 	if(uiState == MAIN){
 		if(key == KEY_LEFT){
 			s2 = (String("Pull ") + decToString(mLBolus) + String(" mL"));
@@ -180,8 +275,6 @@ void doKeyAction(unsigned int key){
 			  mLBolus = 0;
 			}
 		}
-		s1 = String("Used ") + decToString(mLUsed) + String(" mL");
-		s2 = (String("Bolus ") + decToString(mLBolus) + String(" mL"));		
 	}
 	else if(uiState == BOLUS_MENU){
 		if(key == KEY_LEFT){
@@ -202,29 +295,8 @@ void doKeyAction(unsigned int key){
 				mLBolusStep = mLBolusSteps[mLBolusStepIdx];
 			}
 		}
-		s1 = String("Menu> BolusStep");
-		s2 = decToString(mLBolusStep);
 	}
-
-	//update screen
-	lcd.clear();
-
-	s2.toCharArray(charBuf, 16);
-	lcd.cursorTo(2, 0);  //line=2, x=0
-	lcd.printIn(charBuf);
-	
-	s1.toCharArray(charBuf, 16);
-	lcd.cursorTo(1, 0);  //line=1, x=0
-	lcd.printIn(charBuf);
-		
-	
-	//debugging - write character ADC
-	/*
-        lcd.cursorTo(1, 0);  //line=2, x=0
-	String s = String("KEY_ADC: ") + String(adc_key_in);
-	s.toCharArray(charBuf, 16);
-	lcd.printIn(charBuf);  //line=2, x=0
-        */	
+	updateScreen();
 }
 
 
