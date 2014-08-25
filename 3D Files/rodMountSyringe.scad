@@ -3,7 +3,7 @@ include <syringePumpConstants.scad>
 /* === Model-specific Constants === */
 
 //cube containing rods and syringe barrel stop
-mountXSize = 15;
+mountXSize = 10;
 mountZSize = syringeCenterHeight;
 
 
@@ -13,17 +13,11 @@ mountZSize = syringeCenterHeight;
 difference(){
 	cube(size=[mountXSize,baseSizeY,mountZSize]);
 	
-	//608 bearing for threaded rod
-	translate([-floatCorrection,centerY,threadedAxisHeight]){
-		rotate(a=[0,90,0]){
-			bearing608();
-		}
-	}
 	
 	//bore hole for threaded rod
-	translate([floatCorrection,centerY,threadedAxisHeight]){
+	translate([-floatCorrection,centerY,threadedAxisHeight]){
 		rotate(a=[0,90,0]){
-			cylinder(h=mountXSize, r=smoothRodRadius+0.5);
+			cylinder(h=mountXSize+floatCorrection2, r=smoothRodRadius+0.5);
 		}
 	}
 
