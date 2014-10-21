@@ -4,7 +4,7 @@
 #include <LiquidCrystal.h>
 #include <LCDKeypad.h>
 #include <AccelStepper.h>
-
+10/6/2014
 /* -- Constants -- */
 #define SYRINGE_VOLUME_ML 30.0
 #define SYRINGE_BARREL_LENGTH_MM 80.0
@@ -148,6 +148,7 @@ void checkTriggers(){
 void readSerial(){
 		//pulls in characters from serial port as they arrive
 		//builds serialStr and sets ready flag when newline is found
+		//strips newline
 		while (Serial.available()) {
 			char inChar = (char)Serial.read(); 
 			if (inChar == '\n') {

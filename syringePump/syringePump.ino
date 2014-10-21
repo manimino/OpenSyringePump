@@ -1,5 +1,5 @@
 // Controls a stepper motor via an LCD keypad shield.
-// Accepts triggers and serial commands.
+// Accepts triggers and serial commands. Serial speed is 9600.
 
 #include <LiquidCrystal.h>
 #include <LCDKeypad.h>
@@ -11,7 +11,7 @@
 
 #define THREADED_ROD_PITCH 1.25
 #define STEPS_PER_REVOLUTION 200.0
-#define MICROSTEPS_PER_STEP 8.0
+#define MICROSTEPS_PER_STEP 16.0
 
 long ustepsPerMM = MICROSTEPS_PER_STEP * STEPS_PER_REVOLUTION / THREADED_ROD_PITCH;
 long ustepsPerML = (MICROSTEPS_PER_STEP * STEPS_PER_REVOLUTION * SYRINGE_BARREL_LENGTH_MM) / (SYRINGE_VOLUME_ML * THREADED_ROD_PITCH );
@@ -127,7 +127,6 @@ void loop(){
 		processSerial();
 	}
 }
-
 
 void checkTriggers(){
     int pushTriggerValue = digitalRead(pushTriggerPin);

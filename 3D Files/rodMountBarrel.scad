@@ -2,6 +2,8 @@ include <syringePumpConstants.scad>
 
 /* === Model-specific Constants === */
 plungerDiameter = 26.5;
+barrelSlotThickness = 2.5;
+barrelSlotHeight = 36;
 
 //cube containing rods and syringe barrel stop
 mountXSize = 15;
