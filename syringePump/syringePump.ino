@@ -1,5 +1,5 @@
 // Controls a stepper motor via an LCD keypad shield.
-// Accepts triggers and serial commands. Serial speed is 9600.
+// Accepts triggers and serial commands.
 
 #include <LiquidCrystal.h>
 #include <LCDKeypad.h>
@@ -13,6 +13,8 @@
 #define STEPS_PER_REVOLUTION 200.0
 #define MICROSTEPS_PER_STEP 16.0
 
+#define SPEED_MICROSECONDS_DELAY 100 //longer delay = lower speed
+
 long ustepsPerMM = MICROSTEPS_PER_STEP * STEPS_PER_REVOLUTION / THREADED_ROD_PITCH;
 long ustepsPerML = (MICROSTEPS_PER_STEP * STEPS_PER_REVOLUTION * SYRINGE_BARREL_LENGTH_MM) / (SYRINGE_VOLUME_ML * THREADED_ROD_PITCH );
 
@@ -20,15 +22,10 @@ long ustepsPerML = (MICROSTEPS_PER_STEP * STEPS_PER_REVOLUTION * SYRINGE_BARREL_
 int motorDirPin = 2;
 int motorStepPin = 3;
 
-int pullTriggerPin = A2;
-int pushTriggerPin = A3;
+int triggerPin = A3;
+int bigTriggerPin = A4;
 
-const int pwmA = 3;
-const int pwmB = 11;
-const int brakeA = 8;
-const int brakeB = 9;
-
-//Key states
+/* -- Keypad states -- */
 int  adc_key_val[5] ={30, 150, 360, 535, 760 };
 
 enum{ KEY_RIGHT, KEY_UP, KEY_DOWN, KEY_LEFT, KEY_SELECT, KEY_NONE};
@@ -36,7 +33,7 @@ int NUM_KEYS = 5;
 int adc_key_in;
 int key = KEY_NONE;
 
-//various enums
+/* -- Enums and constants -- */
 enum{PUSH,PULL}; //syringe movement direction
 enum{MAIN, BOLUS_MENU}; //UI states
 
@@ -44,10 +41,11 @@ const int mLBolusStepsLength = 9;
 float mLBolusSteps[9] = {0.001, 0.005, 0.010, 0.050, 0.100, 0.500, 1.000, 5.000, 10.000};
 
 /* -- Default Parameters -- */
-int motorSpeed = 4000; //maximum steps per second
-int motorAccel = 80000; //steps/second/second to accelerate
+int motorSpeed = 15000; //maximum steps per second
+int motorAccel = 150000; //steps/second/second to accelerate
 
-float mLBolus = 0.1;
+float mLBolus = 0.500; //default bolus size
+float mLBigBolus = 1.000; //default large bolus size
 float mLUsed = 0.0;
 int mLBolusStepIdx = 3; //0.05 mL increments at first
 float mLBolusStep = mLBolusSteps[mLBolusStepIdx];
@@ -65,8 +63,8 @@ int prevKey = KEY_NONE;
 int uiState = MAIN;
 
 //triggering
-int prevPullTrigger = HIGH;
-int prevPushTrigger = HIGH;
+int prevBigTrigger = HIGH;
+int prevTrigger = HIGH;
 
 //serial
 String serialStr = "";
@@ -81,40 +79,22 @@ void setup(){
   lcd.begin(16, 2);
   lcd.clear();
 
-  lcd.print("SyringePump v0.2");
+  lcd.print("SyringePump v1.0");
 
-  /* Stepper setup */
-  stepper.setMaxSpeed(motorSpeed);
-  stepper.setSpeed(motorSpeed);
-  stepper.setAcceleration(motorAccel);
-
-  pinMode(pwmA, OUTPUT);
-  pinMode(pwmB, OUTPUT);
-  pinMode(brakeA, OUTPUT);
-  pinMode(brakeB, OUTPUT);
-  
-  digitalWrite(pwmA, HIGH);
-  digitalWrite(pwmB, HIGH);
-  digitalWrite(brakeA, LOW);
-  digitalWrite(brakeB, LOW);
-  
   /* Triggering setup */
-  pinMode(pushTriggerPin, INPUT);
-  pinMode(pullTriggerPin, INPUT);
-  digitalWrite(pushTriggerPin, HIGH); //enable pullup resistor
-  digitalWrite(pullTriggerPin, HIGH); //enable pullup resistor
+  pinMode(triggerPin, INPUT);
+  pinMode(bigTriggerPin, INPUT);
+  digitalWrite(triggerPin, HIGH); //enable pullup resistor
+  digitalWrite(bigTriggerPin, HIGH); //enable pullup resistor
   
   /* Serial setup */
   //Note that serial commands must be terminated with a newline
   //to be processed. Check this setting in your serial monitor if 
   //serial commands aren't doing anything.
-  Serial.begin(9600);
+  Serial.begin(57600); //Note that your serial connection must be set to 57600 to work!
 }
 
 void loop(){
-  //update stepper position
-  stepper.run();
-
   //check for LCD updates
   readKey();
   
@@ -129,35 +109,42 @@ void loop(){
 }
 
 void checkTriggers(){
-    int pushTriggerValue = digitalRead(pushTriggerPin);
-    if(pushTriggerValue == HIGH && prevPushTrigger == LOW){
+		//check low-reward trigger line
+    int pushTriggerValue = digitalRead(triggerPin);
+    if(pushTriggerValue == HIGH && prevTrigger == LOW){
       bolus(PUSH);
 			updateScreen();
     }
-    prevPushTrigger = pushTriggerValue;
+    prevTrigger = pushTriggerValue;
     
-    int pullTriggerValue = digitalRead(pullTriggerPin);
-    if(pullTriggerValue == HIGH && prevPullTrigger == LOW){
-      bolus(PULL);
+		//check high-reward trigger line
+    int bigTriggerValue = digitalRead(bigTriggerPin);
+    if(bigTriggerValue == HIGH && prevBigTrigger == LOW){
+			//push big reward amount
+			float mLBolusTemp = mLBolus;
+			mLBolus = mLBigBolus;
+			bolus(PUSH);
+			mLBolus = mLBolusTemp;
+
 			updateScreen();
     }
-    prevPullTrigger = pullTriggerValue;
+    prevBigTrigger = bigTriggerValue;
 }
 
 void readSerial(){
 		//pulls in characters from serial port as they arrive
 		//builds serialStr and sets ready flag when newline is found
-		//strips newline
 		while (Serial.available()) {
 			char inChar = (char)Serial.read(); 
 			if (inChar == '\n') {
 				serialStrReady = true;
 			} 
-      else{
+                        else{
 			  serialStr += inChar;
-      }
+                        }
 		}
 }
+
 void processSerial(){
 	//process serial commands as they are read in
 	if(serialStr.equals("+")){
@@ -168,26 +155,34 @@ void processSerial(){
 		bolus(PULL);
 		updateScreen();
 	}
-	else{
-		Serial.write("Invalid command: ["); 
-		char buf[40];
-		serialStr.toCharArray(buf, 40);
-		Serial.write(buf); 
-		Serial.write("]\n"); 
-	}
-	serialStrReady = false;
+        else if(serialStr.toInt() != 0){
+          int uLbolus = serialStr.toInt();
+          mLBolus = (float)uLbolus / 1000.0;
+          updateScreen();
+        }
+        else{
+           Serial.write("Invalid command: ["); 
+           char buf[40];
+           serialStr.toCharArray(buf, 40);
+           Serial.write(buf); 
+           Serial.write("]\n"); 
+        }
+        serialStrReady = false;
 	serialStr = "";
 }
 
 void bolus(int direction){
+        //Move stepper. Will not return until stepper is done moving.        
+  
 	//change units to steps
-	long steps;
+	long steps = (mLBolus * ustepsPerML);
 	if(direction == PUSH){
+                digitalWrite(motorDirPin, HIGH);
 		steps = mLBolus * ustepsPerML;
 		mLUsed += mLBolus;
 	}
 	else if(direction == PULL){
-		steps = -mLBolus * ustepsPerML;
+                digitalWrite(motorDirPin, LOW);
 		if((mLUsed-mLBolus) > 0){
 			mLUsed -= mLBolus;
 		}
@@ -195,41 +190,24 @@ void bolus(int direction){
 			mLUsed = 0;
 		}
 	}	
-	stepperPos += steps;
-	stepper.moveTo(stepperPos);
-}
 
-void updateScreen(){
-	//build strings for upper and lower lines of screen
-	String s1; //upper line
-	String s2; //lower line
-	
-	if(uiState == MAIN){
-		s1 = String("Used ") + decToString(mLUsed) + String(" mL");
-		s2 = (String("Bolus ") + decToString(mLBolus) + String(" mL"));		
-	}
-	else if(uiState == BOLUS_MENU){
-		s1 = String("Menu> BolusStep");
-		s2 = decToString(mLBolusStep);
-	}
+      float usDelay = SPEED_MICROSECONDS_DELAY; //can go down to 20 or 30
+    
+      for(int i=0; i < steps; i++){ 
+        digitalWrite(motorStepPin, HIGH); 
+        delayMicroseconds(usDelay); 
+    
+        digitalWrite(motorStepPin, LOW); 
+        delayMicroseconds(usDelay); 
+      } 
 
-	//do actual screen update
-	lcd.clear();
-
-	s2.toCharArray(charBuf, 16);
-	lcd.setCursor(0, 1);  //line=2, x=0
-	lcd.print(charBuf);
-	
-	s1.toCharArray(charBuf, 16);
-	lcd.setCursor(0, 0);  //line=1, x=0
-	lcd.print(charBuf);
 }
 
 void readKey(){
 	//Some UI niceness here. 
-	//When user holds down a key, it will repeat every so often (keyRepeatDelay).
-	//But when user presses and releases a key, 
-	//the key becomes responsive again after the shorter debounce period (keyDebounce).
+        //When user holds down a key, it will repeat every so often (keyRepeatDelay).
+        //But when user presses and releases a key, 
+        //the key becomes responsive again after the shorter debounce period (keyDebounce).
 
 	adc_key_in = analogRead(0);
 	key = get_key(adc_key_in); // convert into key press
@@ -309,7 +287,34 @@ void doKeyAction(unsigned int key){
 			}
 		}
 	}
+
 	updateScreen();
+}
+
+void updateScreen(){
+	//build strings for upper and lower lines of screen
+	String s1; //upper line
+	String s2; //lower line
+	
+	if(uiState == MAIN){
+		s1 = String("Used ") + decToString(mLUsed) + String(" mL");
+		s2 = (String("Bolus ") + decToString(mLBolus) + String(" mL"));		
+	}
+	else if(uiState == BOLUS_MENU){
+		s1 = String("Menu> BolusStep");
+		s2 = decToString(mLBolusStep);
+	}
+
+	//do actual screen update
+	lcd.clear();
+
+	s2.toCharArray(charBuf, 16);
+	lcd.setCursor(0, 1);  //line=2, x=0
+	lcd.print(charBuf);
+	
+	s1.toCharArray(charBuf, 16);
+	lcd.setCursor(0, 0);  //line=1, x=0
+	lcd.print(charBuf);
 }
 
 
