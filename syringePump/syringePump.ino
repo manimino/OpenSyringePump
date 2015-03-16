@@ -3,7 +3,6 @@
 
 #include <LiquidCrystal.h>
 #include <LCDKeypad.h>
-#include <AccelStepper.h>
 
 /* -- Constants -- */
 #define SYRINGE_VOLUME_ML 30.0
@@ -41,9 +40,6 @@ const int mLBolusStepsLength = 9;
 float mLBolusSteps[9] = {0.001, 0.005, 0.010, 0.050, 0.100, 0.500, 1.000, 5.000, 10.000};
 
 /* -- Default Parameters -- */
-int motorSpeed = 15000; //maximum steps per second
-int motorAccel = 150000; //steps/second/second to accelerate
-
 float mLBolus = 0.500; //default bolus size
 float mLBigBolus = 1.000; //default large bolus size
 float mLUsed = 0.0;
@@ -71,7 +67,6 @@ String serialStr = "";
 boolean serialStrReady = false;
 
 /* -- Initialize libraries -- */
-AccelStepper stepper(1, motorStepPin, motorDirPin); //the "1" tells it we are using a driver
 LiquidCrystal lcd(8, 13, 9, 4, 5, 6, 7);
 
 void setup(){
@@ -79,13 +74,17 @@ void setup(){
   lcd.begin(16, 2);
   lcd.clear();
 
-  lcd.print("SyringePump v1.0");
+  lcd.print("SyringePump v1.1");
 
   /* Triggering setup */
   pinMode(triggerPin, INPUT);
   pinMode(bigTriggerPin, INPUT);
   digitalWrite(triggerPin, HIGH); //enable pullup resistor
   digitalWrite(bigTriggerPin, HIGH); //enable pullup resistor
+  
+  /* Motor Setup */ 
+  pinMode(motorDirPin, OUTPUT);
+  pinMode(motorStepPin, OUTPUT);
   
   /* Serial setup */
   //Note that serial commands must be terminated with a newline
