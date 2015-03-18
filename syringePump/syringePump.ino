@@ -74,7 +74,7 @@ void setup(){
   lcd.begin(16, 2);
   lcd.clear();
 
-  lcd.print("SyringePump v1.1");
+  lcd.print("SyringePump v2.0");
 
   /* Triggering setup */
   pinMode(triggerPin, INPUT);
