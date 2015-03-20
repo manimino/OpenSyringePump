@@ -1,0 +1,29 @@
+#######################################
+# Syntax Coloring Map For Test
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+
+LCDKeypad	KEYWORD1
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+
+button	KEYWORD2
+
+#######################################
+# Instances (KEYWORD2)
+#######################################
+
+#######################################
+# Constants (LITERAL1)
+#######################################
+KEYPAD_NONE	LITERAL1
+KEYPAD_RIGHT	LITERAL1
+KEYPAD_UP	LITERAL1
+KEYPAD_DOWN	LITERAL1
+KEYPAD_LEFT	LITERAL1
+KEYPAD_SELECT	LITERAL1

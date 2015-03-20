@@ -1,5 +1,12 @@
 // Controls a stepper motor via an LCD keypad shield.
 // Accepts triggers and serial commands.
+// To run, you will need the LCDKeypad library installed - see libraries dir.
+
+// Serial commands:
+// Set serial baud rate to 57600 and terminate commands with newlines.
+// Send a number, e.g. "100", to set bolus size.
+// Send a "+" to push that size bolus.
+// Send a "-" to pull that size bolus.
 
 #include <LiquidCrystal.h>
 #include <LCDKeypad.h>
