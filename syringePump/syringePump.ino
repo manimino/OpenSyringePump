@@ -199,7 +199,7 @@ void bolus(int direction){
 
       float usDelay = SPEED_MICROSECONDS_DELAY; //can go down to 20 or 30
     
-      for(int i=0; i < steps; i++){ 
+      for(long i=0; i < steps; i++){ 
         digitalWrite(motorStepPin, HIGH); 
         delayMicroseconds(usDelay); 
     
