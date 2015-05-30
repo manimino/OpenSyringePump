@@ -14,7 +14,7 @@ plungerWellDepth = plungerThickness + plungerClipThickness;
 
 //trap nut
 nutAcross = 13.2;
-nutDepth = 6.2;
+nutDepth = 6.5;
 nutWellDepth = nutDepth + 0.05; //tight so it won't rattle
 nutWallThicknessFront = plungerWellDepth+3;
 nutWallThicknessBack = 4;
