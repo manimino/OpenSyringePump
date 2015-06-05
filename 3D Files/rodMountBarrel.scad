@@ -15,13 +15,6 @@ mountZSize = syringeCenterHeight;
 difference(){
 	cube(size=[mountXSize,baseSizeY,mountZSize]);
 
-	//608 bearing for threaded rod
-	translate([-floatCorrection,centerY,threadedAxisHeight]){
-		rotate(a=[0,90,0]){
-			nutWell();
-		}
-	}
-	
 	//bore hole for threaded rod
 	translate([-floatCorrection,centerY,threadedAxisHeight]){
 		rotate(a=[0,90,0]){
@@ -46,9 +39,6 @@ difference(){
 		rotate(a=[0,90,0]){
 			cylinder(h=mountXSize+floatCorrection2, r=plungerDiameter/2);
 		}	
-		translate([0,-plungerInnerDiameter/2,0]){
-			cube(size=[barrelSlotThickness+floatCorrection2,plungerInnerDiameter,mountZSize]);
-		}
 	}	
 	
 }
