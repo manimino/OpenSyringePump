@@ -1,13 +1,16 @@
 include <syringePumpConstants.scad>
 
 /* === Model-specific Constants === */
-plungerDiameter = 26.5;
-barrelSlotThickness = 2.5;
-barrelSlotHeight = 36;
 
 //cube containing rods and syringe barrel stop
-mountXSize = 15;
+mountXSize = 20;
 mountZSize = syringeCenterHeight;
+
+//slot parameters
+plungerDiameter = 26.5;
+barrelSlotThickness = 2.5;
+barrelSlotOffset = mountXSize/2 - barrelSlotThickness/2;
+barrelSlotHeight = 36;
 
 /* === Model === */
 
@@ -15,6 +18,13 @@ mountZSize = syringeCenterHeight;
 difference(){
 	cube(size=[mountXSize,baseSizeY,mountZSize]);
 
+	//608 bearing for threaded rod
+	translate([-floatCorrection,centerY,threadedAxisHeight]){
+		rotate(a=[0,90,0]){
+			nutWell();
+		}
+	}
+	
 	//bore hole for threaded rod
 	translate([-floatCorrection,centerY,threadedAxisHeight]){
 		rotate(a=[0,90,0]){
@@ -30,7 +40,7 @@ difference(){
 	}
 
 	//hole for syringe barrel top to go in
-	translate([barrelSlotThickness,centerY,syringeCenterHeight]){
+	translate([barrelSlotOffset,centerY,syringeCenterHeight]){
 		translate([0,-baseSizeY/2,-barrelSlotHeight/2]){
 			cube(size=[barrelSlotThickness, baseSizeY, barrelSlotHeight]);
 		}
@@ -39,6 +49,9 @@ difference(){
 		rotate(a=[0,90,0]){
 			cylinder(h=mountXSize+floatCorrection2, r=plungerDiameter/2);
 		}	
+		translate([0,-plungerInnerDiameter/2,0]){
+			cube(size=[barrelSlotThickness+floatCorrection2,plungerInnerDiameter,mountZSize]);
+		}
 	}	
 	
 }
