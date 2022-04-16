@@ -2,7 +2,7 @@
 
 Deliver small, accurate amounts of liquid. Good for food engineering, CNCs, and bioscience. Cheaper and more flexible than the $1000+ commercial solutions.
 
-This was the first open-source syringe pump, back when 3D printing and open-source hardware took off circa 2015. It saw practical use in many lab and hobby environments. I personally used it in [animal training experiments](github.com/manimino/ShrewDriver) to deliver juice rewards.
+This was the first open-source syringe pump, back when 3D printing and open-source hardware took off circa 2015. It saw practical use in many lab and hobby environments. I personally used it in [animal training experiments](https://github.com/manimino/ShrewDriver) to deliver juice rewards.
 
 Successors improved on this design substantially. If you're making a new syringe pump, go find a newer design instead. This repo's for legacy reasons now, to support anyone with one of these pumps.
 
